@@ -1,6 +1,6 @@
 [
   {
-    "name": "Railway Cloud Node",
-    "url": "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn"
+    "name": "Belgium 🇧🇪 (Cloud Run)",
+    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=/&sni=youtube.com&alpn=http/1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium🇧🇪"
   }
 ]
