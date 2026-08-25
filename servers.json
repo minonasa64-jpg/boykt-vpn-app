@@ -1,6 +1,6 @@
 [
   {
-    "name": "Belgium 🇧🇪 (Cloud Run)",
-    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=/&sni=youtube.com&alpn=http/1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium🇧🇪"
+    "name": "Ooredoo Free 🚀 (Cloudflare)",
+    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@damp-night-476d.minonasa64.workers.dev:443?encryption=none&security=tls&sni=m.youtube.com&fp=randomized&type=ws&host=damp-night-476d.minonasa64.workers.dev&path=%2F%3Fed%3D2048#Ooredoo_Free_🚀"
   }
 ]
