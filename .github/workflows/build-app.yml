@@ -32,7 +32,7 @@ jobs:
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود التطبيق المطور بالواجهة المطابقة للصورة
+        # كتابة كود التطبيق المطور مع تصحيح أنواع البيانات
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -81,10 +81,8 @@ jobs:
           int _secondsConnected = 0;
           bool _timerActive = false;
           
-          String uploadSpeed = "0.0 KB/s";
-          String downloadSpeed = "0.0 KB/s";
-          String uploadedTotal = "0 KB";
-          String downloadedTotal = "0 KB";
+          String uploadSpeed = "0 B/s";
+          String downloadSpeed = "0 B/s";
 
           @override
           void initState() {
@@ -96,10 +94,8 @@ jobs:
                   isConnected = newState;
                   isConnecting = status.state == 'CONNECTING';
                   if (newState) {
-                    uploadSpeed = status.uploadSpeed;
-                    downloadSpeed = status.downloadSpeed;
-                    uploadedTotal = status.uploadTraffic;
-                    downloadedTotal = status.downloadTraffic;
+                    uploadSpeed = "${status.uploadSpeed} B/s";
+                    downloadSpeed = "${status.downloadSpeed} B/s";
                   }
                 });
                 
@@ -329,7 +325,6 @@ jobs:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    // زر الاتصال الرئيسي الدائري
                     Center(
                       child: GestureDetector(
                         onTap: toggleVpn,
@@ -380,8 +375,6 @@ jobs:
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70),
                     ),
                     const SizedBox(height: 15),
-                    
-                    // التبديل التلقائي: إذا كان متصلاً يظهر لوحة القياس الخضراء، وإذا كان غير متصل تظهر قائمة السيرفرات
                     Expanded(
                       child: isConnected
                           ? Container(
@@ -400,7 +393,6 @@ jobs:
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                                 children: [
-                                  // السطر الأول: المدة، معلومات الاتصال، البينغ
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -442,7 +434,6 @@ jobs:
                                       ),
                                     ],
                                   ),
-                                  // السطر الثاني: سرعة الرفع والتحميل
                                   Row(
                                     children: [
                                       Expanded(
@@ -478,7 +469,6 @@ jobs:
                                       ),
                                     ],
                                   ),
-                                  // السطر الثالث: إجمالي البيانات المستهلكة
                                   Row(
                                     children: [
                                       Expanded(
@@ -489,9 +479,9 @@ jobs:
                                             children: [
                                               const Icon(Icons.cloud_upload, color: Colors.white, size: 18),
                                               const SizedBox(height: 4),
-                                              const Text("Uploaded", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const Text("Status", style: TextStyle(fontSize: 11, color: Colors.white70)),
                                               const SizedBox(height: 2),
-                                              Text(uploadedTotal, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                              const Text("Secured", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                                             ],
                                           ),
                                         ),
@@ -505,9 +495,9 @@ jobs:
                                             children: [
                                               const Icon(Icons.cloud_download, color: Colors.white, size: 18),
                                               const SizedBox(height: 4),
-                                              const Text("Downloaded", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const Text("Protocol", style: TextStyle(fontSize: 11, color: Colors.white70)),
                                               const SizedBox(height: 2),
-                                              Text(downloadedTotal, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                              const Text("VLESS / TLS", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                                             ],
                                           ),
                                         ),
