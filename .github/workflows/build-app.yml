@@ -26,10 +26,11 @@ jobs:
         cd my_vpn
         flutter pub add flutter_v2ray
         
-        # تحديث إصدار الأندرويد ليتوافق مع نواة الخادم
+        # تحديث إصدار الأندرويد وصلاحيات الشبكة
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
+        sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود الواجهة البسيطة للتطبيق (زر واحد داكن)
+        # كتابة واجهة التطبيق الجديدة المطابقة للصورة
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -45,7 +46,7 @@ jobs:
               debugShowCheckedModeBanner: false,
               title: 'boykt vpn',
               theme: ThemeData.dark().copyWith(
-                scaffoldBackgroundColor: const Color(0xFF030712),
+                scaffoldBackgroundColor: const Color(0xFF0B0F19),
               ),
               home: const VpnScreen(),
             );
@@ -62,9 +63,10 @@ jobs:
         class _VpnScreenState extends State<VpnScreen> {
           late final FlutterV2ray flutterV2ray;
           bool isConnected = false;
+          bool isConnecting = false;
           
-          // رابط الخادم الخاص بك - مدمج تلقائياً (Hardcoded)
-          final String vlessUrl = "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn";
+          // خادم Railway الخاص بك
+          final String serverConfig = "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn";
 
           @override
           void initState() {
@@ -73,6 +75,7 @@ jobs:
               onStatusChanged: (status) {
                 setState(() {
                   isConnected = status.state == 'CONNECTED';
+                  isConnecting = status.state == 'CONNECTING';
                 });
               },
             );
@@ -84,14 +87,21 @@ jobs:
           }
 
           void toggleVpn() async {
+            setState(() {
+              isConnecting = true;
+            });
             if (isConnected) {
               await flutterV2ray.stopV2Ray();
             } else {
               if (await flutterV2ray.requestPermission()) {
                 await flutterV2ray.startV2Ray(
                   remark: "boykt-vpn",
-                  config: vlessUrl,
+                  config: serverConfig,
                 );
+              } else {
+                setState(() {
+                  isConnecting = false;
+                });
               }
             }
           }
@@ -99,46 +109,129 @@ jobs:
           @override
           Widget build(BuildContext context) {
             return Scaffold(
-              body: Center(
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: const Text("boykt vpn Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("تم تحديث قائمة الخوادم بنجاح")),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              body: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("🛡️ boykt vpn", style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
                     const SizedBox(height: 10),
-                    const Text("تصفح الإنترنت بحرية وأمان", style: TextStyle(fontSize: 16, color: Colors.grey)),
-                    const SizedBox(height: 80),
-                    GestureDetector(
-                      onTap: toggleVpn,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isConnected ? Colors.green : const Color(0xFF1E293B),
-                          border: Border.all(color: isConnected ? Colors.greenAccent : Colors.blueAccent, width: 4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: isConnected ? Colors.green.withOpacity(0.6) : Colors.blueAccent.withOpacity(0.3),
-                              blurRadius: 30,
-                              spreadRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.power_settings_new,
-                          size: 90,
-                          color: isConnected ? Colors.white : Colors.blueAccent,
+                    // زر الاتصال الدائري في الأعلى
+                    Center(
+                      child: GestureDetector(
+                        onTap: toggleVpn,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: 170,
+                          height: 170,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isConnected ? Colors.green : const Color(0xFF2563EB),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isConnected ? Colors.green : Colors.blue).withOpacity(0.4),
+                                blurRadius: 25,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              isConnecting && !isConnected
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Icon(Icons.public_rounded, size: 45, color: Colors.white),
+                              const SizedBox(height: 8),
+                              Text(
+                                isConnecting && !isConnected
+                                    ? "Connecting..."
+                                    : (isConnected ? "Connected" : "Connect"),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 50),
-                    Text(
-                      isConnected ? "متصل ومحمي 🔒" : "اضغط للاتصال",
+                    const SizedBox(height: 35),
+                    // عنوان قسم الخوادم
+                    const Text(
+                      "Available Servers",
                       style: TextStyle(
-                        fontSize: 22, 
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: isConnected ? Colors.greenAccent : Colors.grey
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    // بطاقة الخادم الأول (Railway)
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161E2E),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: isConnected ? Colors.green.withOpacity(0.5) : Colors.transparent),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text("🚀", style: TextStyle(fontSize: 28)),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  "Railway Cloud Node",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  "VLESS / TLS / WebSocket (Fast)",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.signal_cellular_alt, color: Colors.greenAccent, size: 20),
+                          const SizedBox(width: 15),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1F2937),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isConnected ? Icons.check_circle : Icons.flash_on,
+                              color: isConnected ? Colors.greenAccent : Colors.amber,
+                              size: 20,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
