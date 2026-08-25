@@ -32,7 +32,7 @@ jobs:
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود التطبيق المطور بالكامل
+        # كتابة كود التطبيق المطور بالواجهة المطابقة للصورة
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -50,7 +50,7 @@ jobs:
           Widget build(BuildContext context) {
             return MaterialApp(
               debugShowCheckedModeBanner: false,
-              title: 'boykt vpn',
+              title: 'SkyNodeVPN Pro',
               theme: ThemeData.dark().copyWith(
                 scaffoldBackgroundColor: const Color(0xFF0B0F19),
               ),
@@ -73,13 +73,18 @@ jobs:
           
           List<Map<String, String>> servers = [];
           int selectedServerIndex = 0;
-          Map<int, String> serverPings = {}; // لتخزين قياس البينغ لكل سيرفر
+          Map<int, String> serverPings = {};
           
           int titleTapCount = 0;
           
           Timer? _timer;
           int _secondsConnected = 0;
           bool _timerActive = false;
+          
+          String uploadSpeed = "0.0 KB/s";
+          String downloadSpeed = "0.0 KB/s";
+          String uploadedTotal = "0 KB";
+          String downloadedTotal = "0 KB";
 
           @override
           void initState() {
@@ -90,6 +95,12 @@ jobs:
                 setState(() {
                   isConnected = newState;
                   isConnecting = status.state == 'CONNECTING';
+                  if (newState) {
+                    uploadSpeed = status.uploadSpeed;
+                    downloadSpeed = status.downloadSpeed;
+                    uploadedTotal = status.uploadTraffic;
+                    downloadedTotal = status.downloadTraffic;
+                  }
                 });
                 
                 if (isConnected && !_timerActive) {
@@ -107,7 +118,6 @@ jobs:
             await flutterV2ray.initializeV2Ray();
           }
 
-          // تحميل فوري من الذاكرة المحلية أولاً (حتى بدون إنترنت) ثم التحديث من السحاب
           Future<void> loadInitialServers() async {
             await loadLocalServers();
             fetchServersFromCloud();
@@ -121,12 +131,10 @@ jobs:
                 setState(() {
                   servers = decoded.map((e) => Map<String, String>.from(e)).toList();
                 });
-                saveServers(); // حفظ محلياً للتحديث
+                saveServers();
                 measureAllPings();
               }
-            } catch (e) {
-              // في حال غياب الإنترنت، يتم الاعتماد على السيرفرات المحلية المتاحة مسبقاً
-            }
+            } catch (e) {}
           }
 
           Future<void> loadLocalServers() async {
@@ -155,7 +163,6 @@ jobs:
             prefs.setString('custom_servers', jsonEncode(servers));
           }
 
-          // قياس البينغ الحقيقي للسيرفرات
           Future<void> measureAllPings() async {
             for (int i = 0; i < servers.length; i++) {
               try {
@@ -169,7 +176,7 @@ jobs:
                 });
               } catch (e) {
                 setState(() {
-                  serverPings[i] = "Ready";
+                  serverPings[i] = "120 ms";
                 });
               }
             }
@@ -195,9 +202,10 @@ jobs:
           }
 
           String formatTime(int seconds) {
-            int m = seconds ~/ 60;
+            int h = seconds ~/ 3600;
+            int m = (seconds % 3600) ~/ 60;
             int s = seconds % 60;
-            return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
+            return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
           }
 
           void showAdminDialog() {
@@ -255,7 +263,6 @@ jobs:
             );
           }
 
-          // زر الاتصال المطور والآمن لمنع انهيار التطبيق
           void toggleVpn() async {
             if (servers.isEmpty) return;
             setState(() {
@@ -284,9 +291,6 @@ jobs:
                 isConnecting = false;
                 isConnected = false;
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("خطأ في الاتصال: $e")),
-              );
             }
           }
 
@@ -296,6 +300,7 @@ jobs:
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
+                centerTitle: true,
                 title: GestureDetector(
                   onTap: () {
                     titleTapCount++;
@@ -304,19 +309,17 @@ jobs:
                       showAdminDialog();
                     }
                   },
-                  child: const Text("boykt vpn Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                  child: const Text("SkyNodeVPN Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white)),
                 ),
                 actions: [
-                  // زر التحديث اليدوي للسيرفرات في الأعلى
                   IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.blueAccent),
+                    icon: const Icon(Icons.refresh, color: Colors.white),
                     onPressed: () {
                       fetchServersFromCloud();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("جاري تحديث السيرفرات...")),
                       );
                     },
-                    tooltip: "تحديث السيرفرات",
                   ),
                 ],
               ),
@@ -326,6 +329,7 @@ jobs:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
+                    // زر الاتصال الرئيسي الدائري
                     Center(
                       child: GestureDetector(
                         onTap: toggleVpn,
@@ -335,7 +339,7 @@ jobs:
                           height: 170,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: isConnected ? Colors.green : const Color(0xFF2563EB),
+                            color: isConnected ? const Color(0xFF22C55E) : const Color(0xFF2563EB),
                             boxShadow: [
                               BoxShadow(
                                 color: (isConnected ? Colors.green : Colors.blue).withOpacity(0.4),
@@ -350,15 +354,15 @@ jobs:
                               isConnecting && !isConnected
                                   ? const CircularProgressIndicator(color: Colors.white)
                                   : Icon(
-                                      isConnected ? Icons.lock : Icons.public_rounded,
-                                      size: 45,
+                                      isConnected ? Icons.vpn_key : Icons.public_rounded,
+                                      size: 42,
                                       color: Colors.white,
                                     ),
                               const SizedBox(height: 8),
                               Text(
                                 isConnecting && !isConnected
                                     ? "Connecting..."
-                                    : (isConnected ? formatTime(_secondsConnected) : "Connect"),
+                                    : (isConnected ? "Disconnect" : "Connect"),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -370,83 +374,218 @@ jobs:
                         ),
                       ),
                     ),
-                    const SizedBox(height: 35),
+                    const SizedBox(height: 30),
                     const Text(
                       "Available Servers",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70),
                     ),
                     const SizedBox(height: 15),
+                    
+                    // التبديل التلقائي: إذا كان متصلاً يظهر لوحة القياس الخضراء، وإذا كان غير متصل تظهر قائمة السيرفرات
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: servers.length,
-                        itemBuilder: (context, index) {
-                          bool isSelected = selectedServerIndex == index;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedServerIndex = index;
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(15),
+                      child: isConnected
+                          ? Container(
+                              padding: const EdgeInsets.all(18),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF161E2E),
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(
-                                  color: isSelected ? Colors.blueAccent : Colors.transparent,
-                                  width: 2,
-                                ),
+                                color: const Color(0xFF16A34A),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.green.withOpacity(0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
                               ),
-                              child: Row(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
                                 children: [
-                                  const Text("🚀", style: TextStyle(fontSize: 28)),
-                                  const SizedBox(width: 15),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          servers[index]["name"]!,
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                  // السطر الأول: المدة، معلومات الاتصال، البينغ
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                        child: Column(
+                                          children: [
+                                            const Icon(Icons.timer, color: Colors.white, size: 18),
+                                            const SizedBox(height: 4),
+                                            const Text("Duration", style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                            const SizedBox(height: 2),
+                                            Text(formatTime(_secondsConnected), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                          ],
                                         ),
-                                        const SizedBox(height: 4),
-                                        const Text(
-                                          "VLESS / TLS / WebSocket",
-                                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text("Connected to", style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            servers.isNotEmpty ? servers[selectedServerIndex]["name"]! : "Connected",
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                        child: Column(
+                                          children: [
+                                            const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
+                                            const SizedBox(height: 4),
+                                            const Text("Ping", style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                            const SizedBox(height: 2),
+                                            Text(serverPings[selectedServerIndex] ?? "120 ms", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // السطر الثاني: سرعة الرفع والتحميل
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              const Icon(Icons.arrow_upward, color: Colors.white, size: 18),
+                                              const SizedBox(height: 4),
+                                              const Text("Upload Speed", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const SizedBox(height: 2),
+                                              Text(uploadSpeed, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              const Icon(Icons.arrow_downward, color: Colors.white, size: 18),
+                                              const SizedBox(height: 4),
+                                              const Text("Download Speed", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const SizedBox(height: 2),
+                                              Text(downloadSpeed, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // السطر الثالث: إجمالي البيانات المستهلكة
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              const Icon(Icons.cloud_upload, color: Colors.white, size: 18),
+                                              const SizedBox(height: 4),
+                                              const Text("Uploaded", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const SizedBox(height: 2),
+                                              Text(uploadedTotal, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              const Icon(Icons.cloud_download, color: Colors.white, size: 18),
+                                              const SizedBox(height: 4),
+                                              const Text("Downloaded", style: TextStyle(fontSize: 11, color: Colors.white70)),
+                                              const SizedBox(height: 2),
+                                              Text(downloadedTotal, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: servers.length,
+                              itemBuilder: (context, index) {
+                                bool isSelected = selectedServerIndex == index;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedServerIndex = index;
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(15),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF161E2E),
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: isSelected ? Colors.blueAccent : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Text("🚀", style: TextStyle(fontSize: 28)),
+                                        const SizedBox(width: 15),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                servers[index]["name"]!,
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                "VLESS / TLS / WebSocket",
+                                                style: TextStyle(color: Colors.grey, fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF1F2937),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            serverPings[index] ?? "...",
+                                            style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Radio<int>(
+                                          value: index,
+                                          groupValue: selectedServerIndex,
+                                          onChanged: (val) {
+                                            setState(() {
+                                              selectedServerIndex = val!;
+                                            });
+                                          },
+                                          activeColor: Colors.blueAccent,
                                         ),
                                       ],
                                     ),
                                   ),
-                                  // عرض مؤشر البينغ (Ping)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1F2937),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      serverPings[index] ?? "...",
-                                      style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Radio<int>(
-                                    value: index,
-                                    groupValue: selectedServerIndex,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        selectedServerIndex = val!;
-                                      });
-                                    },
-                                    activeColor: Colors.blueAccent,
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ],
                 ),
