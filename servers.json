@@ -1,6 +1,6 @@
 [
   {
     "name": "Belgium VIP 🇧🇪",
-    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=%2F&sni=m.youtube.com&alpn=http%2F1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium"
+    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=%2F&sni=youtube.com&alpn=http%2F1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium"
   }
 ]
