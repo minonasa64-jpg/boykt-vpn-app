@@ -1,6 +1,6 @@
 [
   {
     "name": "Ooredoo France VIP 🚀",
-    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_66bc@fr1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&type=ws&host=fr1.v2less.online&path=%2Fvless#sshocean-boyktavpn-ws"
+    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_66bc@fr1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&allowInsecure=1&type=ws&host=fr1.v2less.online&path=%2Fvless#sshocean-boyktavpn-ws"
   }
 ]
