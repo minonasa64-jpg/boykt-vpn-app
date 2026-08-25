@@ -1,0 +1,161 @@
+name: Build Boykt VPN App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+
+    - name: Create Project and Inject Code
+      run: |
+        flutter create --org com.boykt.vpn --project-name boykt_vpn_app my_vpn
+        cd my_vpn
+        flutter pub add flutter_v2ray
+        
+        # تحديث إصدار الأندرويد ليتوافق مع نواة الخادم
+        sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
+        
+        # كتابة كود الواجهة البسيطة للتطبيق (زر واحد داكن)
+        cat << 'EOF' > lib/main.dart
+        import 'package:flutter/material.dart';
+        import 'package:flutter_v2ray/flutter_v2ray.dart';
+
+        void main() => runApp(const BoyktVpnApp());
+
+        class BoyktVpnApp extends StatelessWidget {
+          const BoyktVpnApp({super.key});
+
+          @override
+          Widget build(BuildContext context) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'boykt vpn',
+              theme: ThemeData.dark().copyWith(
+                scaffoldBackgroundColor: const Color(0xFF030712),
+              ),
+              home: const VpnScreen(),
+            );
+          }
+        }
+
+        class VpnScreen extends StatefulWidget {
+          const VpnScreen({super.key});
+
+          @override
+          State<VpnScreen> createState() => _VpnScreenState();
+        }
+
+        class _VpnScreenState extends State<VpnScreen> {
+          late final FlutterV2ray flutterV2ray;
+          bool isConnected = false;
+          
+          // رابط الخادم الخاص بك - مدمج تلقائياً (Hardcoded)
+          final String vlessUrl = "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn";
+
+          @override
+          void initState() {
+            super.initState();
+            flutterV2ray = FlutterV2ray(
+              onStatusChanged: (status) {
+                setState(() {
+                  isConnected = status.state == 'CONNECTED';
+                });
+              },
+            );
+            initVpn();
+          }
+
+          Future<void> initVpn() async {
+            await flutterV2ray.initializeV2Ray();
+          }
+
+          void toggleVpn() async {
+            if (isConnected) {
+              await flutterV2ray.stopV2Ray();
+            } else {
+              if (await flutterV2ray.requestPermission()) {
+                await flutterV2ray.startV2Ray(
+                  remark: "boykt-vpn",
+                  config: vlessUrl,
+                );
+              }
+            }
+          }
+
+          @override
+          Widget build(BuildContext context) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("🛡️ boykt vpn", style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                    const SizedBox(height: 10),
+                    const Text("تصفح الإنترنت بحرية وأمان", style: TextStyle(fontSize: 16, color: Colors.grey)),
+                    const SizedBox(height: 80),
+                    GestureDetector(
+                      onTap: toggleVpn,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isConnected ? Colors.green : const Color(0xFF1E293B),
+                          border: Border.all(color: isConnected ? Colors.greenAccent : Colors.blueAccent, width: 4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isConnected ? Colors.green.withOpacity(0.6) : Colors.blueAccent.withOpacity(0.3),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.power_settings_new,
+                          size: 90,
+                          color: isConnected ? Colors.white : Colors.blueAccent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 50),
+                    Text(
+                      isConnected ? "متصل ومحمي 🔒" : "اضغط للاتصال",
+                      style: TextStyle(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold,
+                        color: isConnected ? Colors.greenAccent : Colors.grey
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        }
+        EOF
+
+    - name: Build APK
+      run: |
+        cd my_vpn
+        flutter build apk --release
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: boykt-vpn-custom
+        path: my_vpn/build/app/outputs/flutter-apk/app-release.apk
