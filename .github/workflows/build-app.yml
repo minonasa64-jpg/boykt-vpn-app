@@ -32,7 +32,7 @@ jobs:
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود التطبيق مع إصلاح مشكلة العداد
+        # كتابة كود التطبيق المطور بالكامل
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -73,10 +73,10 @@ jobs:
           
           List<Map<String, String>> servers = [];
           int selectedServerIndex = 0;
+          Map<int, String> serverPings = {}; // لتخزين قياس البينغ لكل سيرفر
           
           int titleTapCount = 0;
           
-          // متغيرات العداد الصحيحة
           Timer? _timer;
           int _secondsConnected = 0;
           bool _timerActive = false;
@@ -92,7 +92,6 @@ jobs:
                   isConnecting = status.state == 'CONNECTING';
                 });
                 
-                // تشغيل العداد فقط عند التحول لحالة الاتصال لأول مرة
                 if (isConnected && !_timerActive) {
                   startTimer();
                 } else if (!isConnected && _timerActive) {
@@ -101,25 +100,33 @@ jobs:
               },
             );
             initVpn();
-            fetchServersFromCloud();
+            loadInitialServers();
           }
 
           Future<void> initVpn() async {
             await flutterV2ray.initializeV2Ray();
           }
 
+          // تحميل فوري من الذاكرة المحلية أولاً (حتى بدون إنترنت) ثم التحديث من السحاب
+          Future<void> loadInitialServers() async {
+            await loadLocalServers();
+            fetchServersFromCloud();
+          }
+
           Future<void> fetchServersFromCloud() async {
             try {
-              final response = await http.get(Uri.parse('https://raw.githubusercontent.com/minonasa64-jpg/boykt-vpn-app/main/servers.json'));
+              final response = await http.get(Uri.parse('https://raw.githubusercontent.com/minonasa64-jpg/boykt-vpn-app/main/servers.json')).timeout(const Duration(seconds: 4));
               if (response.statusCode == 200) {
                 List decoded = jsonDecode(response.body);
                 setState(() {
                   servers = decoded.map((e) => Map<String, String>.from(e)).toList();
                 });
-                return;
+                saveServers(); // حفظ محلياً للتحديث
+                measureAllPings();
               }
-            } catch (e) {}
-            loadLocalServers();
+            } catch (e) {
+              // في حال غياب الإنترنت، يتم الاعتماد على السيرفرات المحلية المتاحة مسبقاً
+            }
           }
 
           Future<void> loadLocalServers() async {
@@ -140,11 +147,32 @@ jobs:
                 ];
               });
             }
+            measureAllPings();
           }
 
           Future<void> saveServers() async {
             final prefs = await SharedPreferences.getInstance();
             prefs.setString('custom_servers', jsonEncode(servers));
+          }
+
+          // قياس البينغ الحقيقي للسيرفرات
+          Future<void> measureAllPings() async {
+            for (int i = 0; i < servers.length; i++) {
+              try {
+                Uri uri = Uri.parse(servers[i]["url"]!);
+                String host = uri.host;
+                final stopwatch = Stopwatch()..start();
+                await http.get(Uri.parse('https://$host')).timeout(const Duration(seconds: 3));
+                stopwatch.stop();
+                setState(() {
+                  serverPings[i] = "${stopwatch.elapsedMilliseconds} ms";
+                });
+              } catch (e) {
+                setState(() {
+                  serverPings[i] = "Ready";
+                });
+              }
+            }
           }
 
           void startTimer() {
@@ -213,6 +241,7 @@ jobs:
                           });
                         });
                         saveServers();
+                        measureAllPings();
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("تم إضافة السيرفر بنجاح!")),
@@ -226,33 +255,38 @@ jobs:
             );
           }
 
+          // زر الاتصال المطور والآمن لمنع انهيار التطبيق
           void toggleVpn() async {
             if (servers.isEmpty) return;
             setState(() {
               isConnecting = true;
             });
 
-            if (isConnected) {
-              await flutterV2ray.stopV2Ray();
-            } else {
-              if (await flutterV2ray.requestPermission()) {
-                try {
+            try {
+              if (isConnected) {
+                await flutterV2ray.stopV2Ray();
+              } else {
+                if (await flutterV2ray.requestPermission()) {
                   String activeUrl = servers[selectedServerIndex]["url"]!;
                   V2RayURL parser = FlutterV2ray.parseFromURL(activeUrl);
                   await flutterV2ray.startV2Ray(
                     remark: parser.remark.isNotEmpty ? parser.remark : "boykt-vpn",
                     config: parser.getFullConfiguration(),
                   );
-                } catch (e) {
+                } else {
                   setState(() {
                     isConnecting = false;
                   });
                 }
-              } else {
-                setState(() {
-                  isConnecting = false;
-                });
               }
+            } catch (e) {
+              setState(() {
+                isConnecting = false;
+                isConnected = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("خطأ في الاتصال: $e")),
+              );
             }
           }
 
@@ -273,16 +307,17 @@ jobs:
                   child: const Text("boykt vpn Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                 ),
                 actions: [
-                  if (isConnected)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          formatTime(_secondsConnected),
-                          style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                      ),
-                    ),
+                  // زر التحديث اليدوي للسيرفرات في الأعلى
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.blueAccent),
+                    onPressed: () {
+                      fetchServersFromCloud();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("جاري تحديث السيرفرات...")),
+                      );
+                    },
+                    tooltip: "تحديث السيرفرات",
+                  ),
                 ],
               ),
               body: Padding(
@@ -383,6 +418,19 @@ jobs:
                                       ],
                                     ),
                                   ),
+                                  // عرض مؤشر البينغ (Ping)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1F2937),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      serverPings[index] ?? "...",
+                                      style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
                                   Radio<int>(
                                     value: index,
                                     groupValue: selectedServerIndex,
