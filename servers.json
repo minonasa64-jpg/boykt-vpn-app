@@ -1,14 +1,14 @@
 [
   {
-    "name": "Ooredoo UK VIP 🚀",
-    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_d786@uk1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&type=ws&host=uk1.v2less.online&path=%2Fvless#sshocean-hasa-ws"
+    "name": "UK VIP",
+    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_d786@uk1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&type=ws&host=uk1.v2less.online&path=%2Fvless#uk"
   },
   {
-    "name": "Ooredoo France VIP 🚀",
-    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_66bc@fr1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&path=%2Fvless#sshocean-boyktavpn-ws"
+    "name": "France VIP",
+    "url": "vless://I_Love_%F0%9F%87%B5%F0%9F%87%B8_sshOcean_66bc@fr1.v2less.online:443?encryption=none&security=tls&sni=m.youtube.com&type=ws&host=fr1.v2less.online&path=%2Fvless#france"
   },
   {
-    "name": "Ooredoo Belgium VIP 🇧🇪",
-    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=%2F&sni=youtube.com&alpn=http%2F1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium"
+    "name": "Belgium VIP",
+    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=%2F&sni=youtube.com&alpn=http%2F1.1&host=ryhksn-698624254908.europe-west1.run.app#belgium"
   }
 ]
