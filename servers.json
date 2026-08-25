@@ -1,0 +1,6 @@
+[
+  {
+    "name": "Railway Cloud Node",
+    "url": "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn"
+  }
+]
