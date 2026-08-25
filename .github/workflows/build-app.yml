@@ -32,7 +32,7 @@ jobs:
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود التطبيق المطور مع التحديث السحابي والإخفاء الذكي للأدمن
+        # كتابة كود التطبيق مع إصلاح مشكلة العداد
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -74,24 +74,28 @@ jobs:
           List<Map<String, String>> servers = [];
           int selectedServerIndex = 0;
           
-          int titleTapCount = 0; // لخدعة فتح لوحة الأدمن سرّاً
+          int titleTapCount = 0;
           
-          // عداد وقت الاتصال
+          // متغيرات العداد الصحيحة
           Timer? _timer;
           int _secondsConnected = 0;
+          bool _timerActive = false;
 
           @override
           void initState() {
             super.initState();
             flutterV2ray = FlutterV2ray(
               onStatusChanged: (status) {
+                bool newState = status.state == 'CONNECTED';
                 setState(() {
-                  isConnected = status.state == 'CONNECTED';
+                  isConnected = newState;
                   isConnecting = status.state == 'CONNECTING';
                 });
-                if (isConnected) {
+                
+                // تشغيل العداد فقط عند التحول لحالة الاتصال لأول مرة
+                if (isConnected && !_timerActive) {
                   startTimer();
-                } else {
+                } else if (!isConnected && _timerActive) {
                   stopTimer();
                 }
               },
@@ -104,10 +108,8 @@ jobs:
             await flutterV2ray.initializeV2Ray();
           }
 
-          // جلب السيرفرات تلقائياً من الإنترنت (تحديث سحابي)
           Future<void> fetchServersFromCloud() async {
             try {
-              // يمكنك تغيير الرابط أدناه لاحقاً برابط ملف servers.json الخام من مستودعك على GitHub
               final response = await http.get(Uri.parse('https://raw.githubusercontent.com/minonasa64-jpg/boykt-vpn-app/main/servers.json'));
               if (response.statusCode == 200) {
                 List decoded = jsonDecode(response.body);
@@ -116,9 +118,7 @@ jobs:
                 });
                 return;
               }
-            } catch (e) {
-              // في حال عدم الاتصال بالإنترنت، تحميل السيرفرات المخزنة محلياً
-            }
+            } catch (e) {}
             loadLocalServers();
           }
 
@@ -134,8 +134,8 @@ jobs:
               setState(() {
                 servers = [
                   {
-                    "name": "Railway Cloud Node",
-                    "url": "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn"
+                    "name": "Belgium 🇧🇪 (Cloud Run)",
+                    "url": "vless://537a1276-0aac-491e-9ba8-315e9be373f0@ryhksn-698624254908.europe-west1.run.app:443?type=ws&security=tls&path=/&sni=youtube.com&alpn=http/1.1&host=ryhksn-698624254908.europe-west1.run.app#Belgium🇧🇪"
                   }
                 ];
               });
@@ -148,6 +148,7 @@ jobs:
           }
 
           void startTimer() {
+            _timerActive = true;
             _secondsConnected = 0;
             _timer?.cancel();
             _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -158,6 +159,7 @@ jobs:
           }
 
           void stopTimer() {
+            _timerActive = false;
             _timer?.cancel();
             setState(() {
               _secondsConnected = 0;
@@ -170,7 +172,6 @@ jobs:
             return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
           }
 
-          // لوحة الأدمن السرية
           void showAdminDialog() {
             TextEditingController nameController = TextEditingController();
             TextEditingController urlController = TextEditingController();
@@ -263,7 +264,6 @@ jobs:
                 elevation: 0,
                 title: GestureDetector(
                   onTap: () {
-                    // اضغط 5 مرات متتالية على العنوان لتفتح لوحة الأدمن سرّاً
                     titleTapCount++;
                     if (titleTapCount >= 5) {
                       titleTapCount = 0;
@@ -273,7 +273,6 @@ jobs:
                   child: const Text("boykt vpn Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                 ),
                 actions: [
-                  // مؤسر وقت الاتصال الصغير في الأعلى
                   if (isConnected)
                     Center(
                       child: Padding(
@@ -292,7 +291,6 @@ jobs:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    // زر الاتصال الدائري
                     Center(
                       child: GestureDetector(
                         onTap: toggleVpn,
