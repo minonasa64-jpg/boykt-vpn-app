@@ -25,15 +25,18 @@ jobs:
         flutter create --org com.boykt.vpn --project-name boykt_vpn_app my_vpn
         cd my_vpn
         flutter pub add flutter_v2ray
+        flutter pub add shared_preferences
         
         # تحديث إصدار الأندرويد وصلاحيات الشبكة
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة واجهة التطبيق الجديدة المطابقة للصورة
+        # كتابة كود التطبيق مع لوحة التحكم (زر الأدمن)
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
+        import 'package:shared_preferences/shared_preferences.dart';
+        import 'dart:convert';
 
         void main() => runApp(const BoyktVpnApp());
 
@@ -65,8 +68,8 @@ jobs:
           bool isConnected = false;
           bool isConnecting = false;
           
-          // خادم Railway الخاص بك
-          final String serverConfig = "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn";
+          List<Map<String, String>> servers = [];
+          int selectedServerIndex = 0;
 
           @override
           void initState() {
@@ -80,24 +83,124 @@ jobs:
               },
             );
             initVpn();
+            loadServers();
           }
 
           Future<void> initVpn() async {
             await flutterV2ray.initializeV2Ray();
           }
 
+          // تحميل السيرفرات المحفوظة أو تعيين سيرفر افتراضي
+          Future<void> loadServers() async {
+            final prefs = await SharedPreferences.getInstance();
+            final String? savedServers = prefs.getString('custom_servers');
+            
+            if (savedServers != null) {
+              List decoded = jsonDecode(savedServers);
+              setState(() {
+                servers = decoded.map((e) => Map<String, String>.from(e)).toList();
+              });
+            } else {
+              // السيرفر الافتراضي الخاص بك
+              servers = [
+                {
+                  "name": "Railway Cloud Node",
+                  "url": "vless://b831b0b5-77ce-43db-b06c-847cb59d8328@m-production-53f4.up.railway.app:443?encryption=none&security=tls&sni=m-production-53f4.up.railway.app&type=ws&host=m-production-53f4.up.railway.app&path=%2fvless#boykt-vpn"
+                }
+              ];
+              saveServers();
+            }
+          }
+
+          Future<void> saveServers() async {
+            final prefs = await SharedPreferences.getInstance();
+            prefs.setString('custom_servers', jsonEncode(servers));
+          }
+
+          // نافذة إضافة سيرفر جديد (لوحة الأدمن)
+          void showAdminDialog() {
+            TextEditingController nameController = TextEditingController();
+            TextEditingController urlController = TextEditingController();
+
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: const Color(0xFF161E2E),
+                title: const Text("لوحة تحكم الأدمن (إضافة سيرفر)", style: TextStyle(color: Colors.white, fontSize: 18)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: "اسم السيرفر (مثال: سيرفر رقم 2)",
+                        labelStyle: TextStyle(color: Colors.grey),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: urlController,
+                      decoration: const InputDecoration(
+                        labelText: "رابط VLESS",
+                        labelStyle: TextStyle(color: Colors.grey),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("إلغاء", style: TextStyle(color: Colors.redAccent)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                    onPressed: () {
+                      if (nameController.text.isNotEmpty && urlController.text.isNotEmpty) {
+                        setState(() {
+                          servers.add({
+                            "name": nameController.text,
+                            "url": urlController.text,
+                          });
+                        });
+                        saveServers();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("تم إضافة السيرفر بنجاح!")),
+                        );
+                      }
+                    },
+                    child: const Text("إضافة"),
+                  ),
+                ],
+              ),
+            );
+          }
+
           void toggleVpn() async {
+            if (servers.isEmpty) return;
+            
             setState(() {
               isConnecting = true;
             });
+
             if (isConnected) {
               await flutterV2ray.stopV2Ray();
             } else {
               if (await flutterV2ray.requestPermission()) {
-                await flutterV2ray.startV2Ray(
-                  remark: "boykt-vpn",
-                  config: serverConfig,
-                );
+                try {
+                  String activeUrl = servers[selectedServerIndex]["url"]!;
+                  V2RayURL parser = FlutterV2ray.parseFromURL(activeUrl);
+                  await flutterV2ray.startV2Ray(
+                    remark: parser.remark.isNotEmpty ? parser.remark : "boykt-vpn",
+                    config: parser.getFullConfiguration(),
+                  );
+                } catch (e) {
+                  setState(() {
+                    isConnecting = false;
+                  });
+                }
               } else {
                 setState(() {
                   isConnecting = false;
@@ -114,13 +217,11 @@ jobs:
                 elevation: 0,
                 title: const Text("boykt vpn Pro", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                 actions: [
+                  // زر الأدمن لإضافة السيرفرات
                   IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("تم تحديث قائمة الخوادم بنجاح")),
-                      );
-                    },
+                    icon: const Icon(Icons.admin_panel_settings, color: Colors.amber, size: 26),
+                    onPressed: showAdminDialog,
+                    tooltip: "لوحة الأدمن",
                   ),
                 ],
               ),
@@ -130,7 +231,7 @@ jobs:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    // زر الاتصال الدائري في الأعلى
+                    // زر الاتصال الدائري
                     Center(
                       child: GestureDetector(
                         onTap: toggleVpn,
@@ -154,7 +255,11 @@ jobs:
                             children: [
                               isConnecting && !isConnected
                                   ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Icon(Icons.public_rounded, size: 45, color: Colors.white),
+                                  : Icon(
+                                      isConnected ? Icons.lock : Icons.public_rounded,
+                                      size: 45,
+                                      color: Colors.white,
+                                    ),
                               const SizedBox(height: 8),
                               Text(
                                 isConnecting && !isConnected
@@ -172,7 +277,6 @@ jobs:
                       ),
                     ),
                     const SizedBox(height: 35),
-                    // عنوان قسم الخوادم
                     const Text(
                       "Available Servers",
                       style: TextStyle(
@@ -182,56 +286,68 @@ jobs:
                       ),
                     ),
                     const SizedBox(height: 15),
-                    // بطاقة الخادم الأول (Railway)
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF161E2E),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: isConnected ? Colors.green.withOpacity(0.5) : Colors.transparent),
-                      ),
-                      child: Row(
-                        children: [
-                          const Text("🚀", style: TextStyle(fontSize: 28)),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  "Railway Cloud Node",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
+                    // قائمة السيرفرات الديناميكية
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: servers.length,
+                        itemBuilder: (context, index) {
+                          bool isSelected = selectedServerIndex == index;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedServerIndex = index;
+                              });
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF161E2E),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(
+                                  color: isSelected ? Colors.blueAccent : Colors.transparent,
+                                  width: 2,
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  "VLESS / TLS / WebSocket (Fast)",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  const Text("🚀", style: TextStyle(fontSize: 28)),
+                                  const SizedBox(width: 15),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          servers[index]["name"]!,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          "VLESS / TLS / WebSocket",
+                                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Radio<int>(
+                                    value: index,
+                                    groupValue: selectedServerIndex,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        selectedServerIndex = val!;
+                                      });
+                                    },
+                                    activeColor: Colors.blueAccent,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.signal_cellular_alt, color: Colors.greenAccent, size: 20),
-                          const SizedBox(width: 15),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1F2937),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              isConnected ? Icons.check_circle : Icons.flash_on,
-                              color: isConnected ? Colors.greenAccent : Colors.amber,
-                              size: 20,
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ],
