@@ -32,7 +32,7 @@ jobs:
         sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle
         sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
         
-        # كتابة كود التطبيق المطور مع تصحيح أنواع البيانات
+        # كتابة كود التطبيق المطور مع تصحيح أنواع البيانات وفك التشفير المخفي
         cat << 'EOF' > lib/main.dart
         import 'package:flutter/material.dart';
         import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -123,14 +123,21 @@ jobs:
             try {
               final response = await http.get(Uri.parse('https://raw.githubusercontent.com/minonasa64-jpg/boykt-vpn-app/main/servers.json')).timeout(const Duration(seconds: 4));
               if (response.statusCode == 200) {
-                List decoded = jsonDecode(response.body);
+                // 🚀 الجديد: التطبيق يقرأ النص المشفر، يفك التشفير، ثم يقرأ البيانات سراً
+                String encodedData = response.body.trim();
+                List<int> decodedBytes = base64.decode(encodedData);
+                String decodedString = utf8.decode(decodedBytes);
+                
+                List decoded = jsonDecode(decodedString);
                 setState(() {
                   servers = decoded.map((e) => Map<String, String>.from(e)).toList();
                 });
                 saveServers();
                 measureAllPings();
               }
-            } catch (e) {}
+            } catch (e) {
+              print("❌ خطأ في الاتصال أو فك التشفير: $e");
+            }
           }
 
           Future<void> loadLocalServers() async {
